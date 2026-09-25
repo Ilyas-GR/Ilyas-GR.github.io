@@ -353,6 +353,22 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
  addEventListener('scroll',queue,{passive:true});addEventListener('resize',queue);
  [desk,still].forEach(function(m){m.addEventListener?m.addEventListener('change',queue):m.addListener(queue)});
 
+ // never leave the hand-off half done: when scrolling stops midway, carry on towards the end the reader was heading for
+ var lastY=scrollY,dir=1,snapping=false,idle,hasEnd='onscrollend' in window;
+ function settle(){
+  if(snapping){snapping=false;return}
+  if(!motion())return;
+  var h=hero.getBoundingClientRect(),span=Math.max(1,h.height-120),p=-h.top/span,top=scrollY+h.top;
+  if(p<=.01||p>=.7)return;
+  snapping=true;
+  scrollTo({top:dir>0?Math.ceil(top+span*.7)+1:top,behavior:'smooth'});
+ }
+ addEventListener('scroll',function(){
+  var y=scrollY;if(y!==lastY)dir=y>lastY?1:-1;lastY=y;
+  if(!hasEnd){clearTimeout(idle);idle=setTimeout(settle,160)}
+ },{passive:true});
+ if(hasEnd)addEventListener('scrollend',settle);
+
  // table of contents: highlight the section in the middle of the screen
  var links=document.querySelectorAll('.toc a');
  function current(id){for(var j=0;j<links.length;j++){if(links[j].getAttribute('href')==='#'+id)links[j].setAttribute('aria-current','true');else links[j].removeAttribute('aria-current')}}
