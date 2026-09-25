@@ -302,7 +302,8 @@ try{var s=localStorage.getItem(k);if(s)r.setAttribute('data-theme',s);}catch(e){
 b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');var n=d==='dark'?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem(k,n)}catch(e){}});})();
 </script>
 <script>
-/* Scrolling moves the hero photo, relative to the window, into its slot in the sticky sidebar card (a phone gets a top bar instead). */
+/* Scrolling moves the hero photo, relative to the window, into its slot in the sticky sidebar card (a phone gets a top bar instead).
+   On desktop one wheel step plays the whole hand-off as a single glide that stops with the content pressed to the top edge. */
 (function(){
  var hero=document.querySelector('.hero'),fly=document.getElementById('fly'),frame=fly.querySelector('.photo'),photo=frame.querySelector('img'),
      fade=document.querySelectorAll('.hero>div:first-child>*,.badge'),
@@ -314,7 +315,9 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
  function clamp(v){return v<0?0:v>1?1:v}
  function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
  function motion(){return desk.matches&&!still.matches}
- function style(list,prop,val){for(i=0;i<list.length;i++)list[i].style[prop]=typeof val==='function'?val(i):val}
+ function style(list,prop,val){for(i=0;i<list.length;i++)list[i].style[prop]=val}
+ // scroll position where the content and the sidebar reach their sticky spot at the top of the window
+ function end(){return Math.max(1,Math.round(layout.getBoundingClientRect().top+scrollY-(parseFloat(getComputedStyle(side).top)||0)))}
 
  function setOn(v){
   on=v;side.classList.toggle('on',v);bar.classList.toggle('on',v);bar.setAttribute('aria-hidden',String(!v));
@@ -323,20 +326,20 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
 
  function paint(){
   queued=false;
-  var h=hero.getBoundingClientRect(),p=clamp(-h.top/Math.max(1,h.height-120));
+  var E=end(),p=clamp(scrollY/E);
   if(!on&&p>.7)setOn(true);else if(on&&p<.55)setOn(false);
   if(motion()){
-   // e runs 0..1 while the hero scrolls away; at 1 the photo sits exactly on the sidebar avatar
-   var e=ease(clamp(p/.7)),s=fly.parentNode.getBoundingClientRect(),t=ava.getBoundingClientRect(),
+   // p runs 0..1 up to the sticky point; at 1 the photo sits exactly on the sidebar avatar
+   var s=fly.parentNode.getBoundingClientRect(),t=ava.getBoundingClientRect(),
        pad=parseFloat(getComputedStyle(frame).paddingLeft)||0,k=t.width/photo.offsetWidth,
-       x=(t.left-s.left-pad*k)*e,y=(t.top-s.top-pad*k)*e,done=e>=1,
-       o=1-clamp(p*1.7),so=clamp((p-.42)/.28),
+       x=(t.left-s.left-pad*k)*p,y=(t.top-s.top-pad*k)*p,done=scrollY>=E-.5,
+       o=1-clamp(p*2),so=clamp((p-.55)/.45),
        // content starts as wide as the hero and narrows to make room for the sidebar before it fades in
-       w=(side.offsetWidth+(parseFloat(getComputedStyle(layout).columnGap)||0))*(1-ease(clamp(p/.45)));
+       w=(side.offsetWidth+(parseFloat(getComputedStyle(layout).columnGap)||0))*(1-ease(clamp(p/.6)));
    main.style.marginLeft=w>.5?-w+'px':'';
-   fly.style.transform=e>0?'translate('+x+'px,'+y+'px) scale('+(1+(k-1)*e)+')':'';
-   frame.style.transition=e>0?'none':'';
-   frame.style.transform=e>0?'rotateY('+(-10*(1-e))+'deg) rotateX('+(4*(1-e))+'deg)':'';
+   fly.style.transform=p>0?'translate('+x+'px,'+y+'px) scale('+(1+(k-1)*p)+')':'';
+   frame.style.transition=p>0?'none':'';
+   frame.style.transform=p>0?'rotateY('+(-10*(1-p))+'deg) rotateX('+(4*(1-p))+'deg)':'';
    fly.style.visibility=done?'hidden':'';
    ava.style.visibility=done?'':'hidden';
    style(parts,'transition','none');style(parts,'opacity',so);style(parts,'visibility',so>0?'visible':'hidden');
@@ -353,15 +356,37 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
  addEventListener('scroll',queue,{passive:true});addEventListener('resize',queue);
  [desk,still].forEach(function(m){m.addEventListener?m.addEventListener('change',queue):m.addListener(queue)});
 
- // never leave the hand-off half done: when scrolling stops midway, carry on towards the end the reader was heading for
- var lastY=scrollY,dir=1,snapping=false,idle,hasEnd='onscrollend' in window;
+ // our own scroll animation, so the hand-off never pauses halfway
+ var glideAnim=null,lockUntil=0;
+ function glide(to){
+  var from=scrollY;if(Math.abs(to-from)<1)return;
+  if(glideAnim)cancelAnimationFrame(glideAnim.raf);
+  var t0=performance.now(),dur=Math.min(900,Math.max(500,Math.abs(to-from)*1.3));
+  glideAnim={dir:to>from?1:-1};
+  (function step(now){
+   var k=clamp((now-t0)/dur),q=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+   scrollTo({top:from+(to-from)*q,behavior:'instant'});
+   if(k<1)glideAnim.raf=requestAnimationFrame(step);
+   else{if(glideAnim.dir>0)lockUntil=performance.now()+350;glideAnim=null}
+  })(t0);
+ }
+ addEventListener('wheel',function(ev){
+  if(!motion()||ev.ctrlKey||!ev.deltaY)return;
+  var d=ev.deltaY>0?1:-1,px=ev.deltaY*(ev.deltaMode===1?40:ev.deltaMode===2?innerHeight:1),y=scrollY,E=end();
+  if(glideAnim){ev.preventDefault();if(d!==glideAnim.dir)glide(d>0?E:0);return}
+  // swallow the touchpad's leftover momentum after arriving at the content
+  if(d>0&&Math.abs(y-E)<=1&&performance.now()<lockUntil){ev.preventDefault();lockUntil=performance.now()+350;return}
+  if(d>0&&y<E-1){ev.preventDefault();glide(E)}
+  else if(d<0&&y>1&&y<=E+1){ev.preventDefault();glide(0)}
+  else if(d<0&&y>E+1&&y+px<E){ev.preventDefault();glide(E)}
+ },{passive:false});
+
+ // keyboard or scrollbar: if the page is left inside the hand-off, finish it towards where the reader was heading
+ var lastY=scrollY,dir=1,idle,hasEnd='onscrollend' in window;
  function settle(){
-  if(snapping){snapping=false;return}
-  if(!motion())return;
-  var h=hero.getBoundingClientRect(),span=Math.max(1,h.height-120),p=-h.top/span,top=scrollY+h.top;
-  if(p<=.01||p>=.7)return;
-  snapping=true;
-  scrollTo({top:dir>0?Math.ceil(top+span*.7)+1:top,behavior:'smooth'});
+  if(glideAnim||!motion())return;
+  var E=end(),p=scrollY/E;
+  if(p>.005&&p<.995)glide(dir>0?E:0);
  }
  addEventListener('scroll',function(){
   var y=scrollY;if(y!==lastY)dir=y>lastY?1:-1;lastY=y;
