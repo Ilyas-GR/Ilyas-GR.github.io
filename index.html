@@ -291,10 +291,10 @@ footer{margin-top:40px;display:flex;flex-wrap:wrap;justify-content:space-between
    </div>
   </div>
  </section>
- </main>
- </div>
 
  <footer><span>Ильяс Гибайдуллин, инженер-конструктор</span><span>Санкт-Петербург, 2026</span></footer>
+ </main>
+ </div>
 </div>
 <script>
 (function(){var b=document.getElementById('t'),r=document.documentElement,k='cv-theme';
@@ -358,13 +358,16 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
 
  // our own scroll animation, so the hand-off never pauses halfway
  var glideAnim=null,lockUntil=0;
- function glide(to){
-  var from=scrollY;if(Math.abs(to-from)<1)return;
+ // target may be a function: it is re-read every frame because the content changes height while it narrows
+ function glide(target){
+  var get=typeof target==='function'?target:function(){return target},from=scrollY,to=get();
+  if(Math.abs(to-from)<1)return;
   if(glideAnim)cancelAnimationFrame(glideAnim.raf);
   var t0=performance.now(),dur=Math.min(900,Math.max(500,Math.abs(to-from)*1.3));
   glideAnim={dir:to>from?1:-1};
   (function step(now){
    var k=clamp((now-t0)/dur),q=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+   to=get();
    scrollTo({top:from+(to-from)*q,behavior:'instant'});
    if(k<1)glideAnim.raf=requestAnimationFrame(step);
    else{if(glideAnim.dir>0)lockUntil=performance.now()+350;glideAnim=null}
@@ -393,6 +396,18 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
   if(!hasEnd){clearTimeout(idle);idle=setTimeout(settle,160)}
  },{passive:true});
  if(hasEnd)addEventListener('scrollend',settle);
+
+ // sidebar menu: "Коротко" returns to the very top with the big photo, other sections stop pressed to the top edge
+ side.querySelector('.toc').addEventListener('click',function(ev){
+  var a=ev.target.closest('a');if(!a||!motion())return;
+  var sec=document.querySelector(a.getAttribute('href'));if(!sec)return;
+  ev.preventDefault();
+  if(sec===main.firstElementChild){glide(0);return}
+  glide(function(){
+   var max=document.documentElement.scrollHeight-innerHeight;
+   return Math.min(max,Math.round(sec.getBoundingClientRect().top+scrollY-(parseFloat(getComputedStyle(side).top)||0)));
+  });
+ });
 
  // table of contents: highlight the section in the middle of the screen
  var links=document.querySelectorAll('.toc a');
