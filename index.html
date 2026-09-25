@@ -26,7 +26,7 @@
   --ink:#E8EEF7; --muted:#97A5BA; --panel:rgba(22,33,56,.62); --panel-edge:rgba(140,170,230,.18); --panel-line:rgba(200,215,240,.08);
   --shadow:0 1px 0 rgba(160,190,255,.10) inset, 0 24px 60px -24px rgba(0,0,0,.7), 0 2px 8px -2px rgba(0,0,0,.4);
   --accent:#6F8FFF; --accent2:#4FD2EA; --grid:rgba(111,143,255,.24); --grid2:rgba(111,143,255,.08); --dot:rgba(170,195,255,.13); --orbhi:rgba(150,180,255,.10);}
-html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg1);overflow-x:hidden}
+html{overflow-anchor:none;scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg1);overflow-x:hidden}
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;min-height:100%;color:var(--ink);font:400 17px/1.6 "Manrope",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased;background:transparent;overflow-x:clip;}
 /* fixed backdrop: gradient + 3D grid + dots, content scrolls over it */
@@ -306,7 +306,7 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
 (function(){
  var hero=document.querySelector('.hero'),fly=document.getElementById('fly'),frame=fly.querySelector('.photo'),photo=frame.querySelector('img'),
      fade=document.querySelectorAll('.hero>div:first-child>*,.badge'),
-     side=document.getElementById('side'),parts=side.children,ava=document.getElementById('ava'),bar=document.getElementById('bar'),
+     side=document.getElementById('side'),parts=side.children,main=document.querySelector('.main'),layout=main.parentNode,ava=document.getElementById('ava'),bar=document.getElementById('bar'),
      desk=matchMedia('(min-width:981px)'),still=matchMedia('(prefers-reduced-motion: reduce)'),
      on=false,queued=false,i;
  ava.src=photo.src;document.getElementById('barAva').src=photo.src;
@@ -330,7 +330,10 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
    var e=ease(clamp(p/.7)),s=fly.parentNode.getBoundingClientRect(),t=ava.getBoundingClientRect(),
        pad=parseFloat(getComputedStyle(frame).paddingLeft)||0,k=t.width/photo.offsetWidth,
        x=(t.left-s.left-pad*k)*e,y=(t.top-s.top-pad*k)*e,done=e>=1,
-       o=1-clamp(p*1.7),so=clamp((p-.3)/.4);
+       o=1-clamp(p*1.7),so=clamp((p-.42)/.28),
+       // content starts as wide as the hero and narrows to make room for the sidebar before it fades in
+       w=(side.offsetWidth+(parseFloat(getComputedStyle(layout).columnGap)||0))*(1-ease(clamp(p/.45)));
+   main.style.marginLeft=w>.5?-w+'px':'';
    fly.style.transform=e>0?'translate('+x+'px,'+y+'px) scale('+(1+(k-1)*e)+')':'';
    frame.style.transition=e>0?'none':'';
    frame.style.transform=e>0?'rotateY('+(-10*(1-e))+'deg) rotateX('+(4*(1-e))+'deg)':'';
@@ -339,7 +342,7 @@ b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(match
    style(parts,'transition','none');style(parts,'opacity',so);style(parts,'visibility',so>0?'visible':'hidden');
    style(fade,'opacity',o);style(fade,'visibility',o<.02?'hidden':'');
   }else{
-   fly.style.transform=fly.style.visibility=frame.style.transition=frame.style.transform=ava.style.visibility='';
+   main.style.marginLeft=fly.style.transform=fly.style.visibility=frame.style.transition=frame.style.transform=ava.style.visibility='';
    style(parts,'transition','');style(parts,'opacity','');style(parts,'visibility','');
    style(fade,'opacity','');style(fade,'visibility','');
   }
