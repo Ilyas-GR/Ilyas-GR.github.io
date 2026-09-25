@@ -55,7 +55,7 @@ a{color:var(--accent)} a:focus-visible,button:focus-visible{outline:2px solid va
 .wrap{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:0 28px 64px}
 
 /* hero with perspective grid floor */
-.hero{position:relative;padding:88px 0 72px;display:grid;grid-template-columns:1fr 300px;gap:56px;align-items:center}
+.hero{position:relative;z-index:2;padding:88px 0 72px;display:grid;grid-template-columns:1fr 300px;gap:56px;align-items:center}
 .floor{position:absolute;left:calc(50% - 50vw);width:100vw;bottom:0;height:320px;z-index:-1;perspective:420px;overflow:hidden;
   -webkit-mask-image:linear-gradient(to top,#000 10%,transparent 85%);mask-image:linear-gradient(to top,#000 10%,transparent 85%)}
 .floor::before{content:"";position:absolute;left:0;right:0;bottom:-40%;height:180%;transform:rotateX(62deg);transform-origin:bottom;
@@ -120,7 +120,7 @@ footer{margin-top:40px;display:flex;flex-wrap:wrap;justify-content:space-between
   background:var(--panel);border:1px solid var(--panel-edge);box-shadow:var(--shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);cursor:pointer}
 
 /* two columns below the hero: sticky profile on the left, content on the right */
-.fly{transform-origin:left center;will-change:transform}
+.fly{transform-origin:left top;will-change:transform}
 .layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:28px;align-items:start}
 .main .panel{grid-template-columns:1fr;gap:18px;padding:34px 38px}
 .main .panel:first-child{margin-top:0}
@@ -148,7 +148,6 @@ footer{margin-top:40px;display:flex;flex-wrap:wrap;justify-content:space-between
 .toc a:hover{color:var(--ink)}
 .toc a[aria-current="true"]{color:var(--ink);background:linear-gradient(135deg,rgba(47,91,234,.14),rgba(24,169,201,.10))}
 .toc a[aria-current="true"]::before{background:var(--accent);opacity:1;box-shadow:0 0 0 3px rgba(47,91,234,.18)}
-.ghost{position:fixed;z-index:4;margin:0;object-fit:cover;border-radius:16px;pointer-events:none;box-shadow:0 20px 40px -18px rgba(20,40,80,.5)}
 
 /* phone: compact bar slides in from the top instead of the sidebar */
 .bar{position:fixed;left:0;right:0;top:0;z-index:4;display:flex;align-items:center;gap:12px;
@@ -187,7 +186,7 @@ footer{margin-top:40px;display:flex;flex-wrap:wrap;justify-content:space-between
   .timeline li{grid-template-columns:1fr;gap:2px}
   .lead{font-size:17px}
 }
-@media print{body{background:#fff}body::before,.bg,.theme,.contacts,.side,.bar,.ghost{display:none}.layout{display:block}.fly{transform:none !important;visibility:visible !important}.hero>div>*{opacity:1 !important;visibility:visible !important}.panel{box-shadow:none;backdrop-filter:none}}
+@media print{body{background:#fff}body::before,.bg,.theme,.contacts,.side,.bar{display:none}.layout{display:block}.fly{transform:none !important;visibility:visible !important}.hero>div>*{opacity:1 !important;visibility:visible !important}.panel{box-shadow:none;backdrop-filter:none}}
 </style>
 </head>
 <body>
@@ -303,63 +302,53 @@ try{var s=localStorage.getItem(k);if(s)r.setAttribute('data-theme',s);}catch(e){
 b.addEventListener('click',function(){var d=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');var n=d==='dark'?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem(k,n)}catch(e){}});})();
 </script>
 <script>
-/* On scroll the hero photo drifts left and shrinks, then flies into the sticky sidebar (a phone gets a top bar instead). */
+/* Scrolling moves the hero photo, relative to the window, into its slot in the sticky sidebar card (a phone gets a top bar instead). */
 (function(){
- var hero=document.querySelector('.hero'),fly=document.getElementById('fly'),photo=fly.querySelector('img'),
+ var hero=document.querySelector('.hero'),fly=document.getElementById('fly'),frame=fly.querySelector('.photo'),photo=frame.querySelector('img'),
      fade=document.querySelectorAll('.hero>div:first-child>*,.badge'),
-     side=document.getElementById('side'),ava=document.getElementById('ava'),bar=document.getElementById('bar'),
+     side=document.getElementById('side'),parts=side.children,ava=document.getElementById('ava'),bar=document.getElementById('bar'),
      desk=matchMedia('(min-width:981px)'),still=matchMedia('(prefers-reduced-motion: reduce)'),
-     on=false,anim=null,queued=false,i;
+     on=false,queued=false,i;
  ava.src=photo.src;document.getElementById('barAva').src=photo.src;
 
  function clamp(v){return v<0?0:v>1?1:v}
  function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
  function motion(){return desk.matches&&!still.matches}
+ function style(list,prop,val){for(i=0;i<list.length;i++)list[i].style[prop]=typeof val==='function'?val(i):val}
 
- function stop(){if(anim){cancelAnimationFrame(anim.raf);anim.g.remove();anim.show.style.visibility='';anim=null}}
- // ghost image travels between two elements; the target is re-measured every frame because the page may still be scrolling
- function flight(fromEl,hideFrom,toEl,hideTo){
-  stop();
-  var a=fromEl.getBoundingClientRect();if(!a.width)return;
-  var g=photo.cloneNode(false);g.removeAttribute('id');g.className='ghost';g.alt='';g.setAttribute('aria-hidden','true');
-  document.body.appendChild(g);
-  hideFrom.style.visibility='hidden';hideTo.style.visibility='hidden';
-  var t0=performance.now();
-  anim={g:g,show:hideTo};
-  (function step(now){
-   var k=ease(clamp((now-t0)/650)),b=toEl.getBoundingClientRect();
-   g.style.left=a.left+(b.left-a.left)*k+'px';g.style.top=a.top+(b.top-a.top)*k+'px';
-   g.style.width=a.width+(b.width-a.width)*k+'px';g.style.height=a.height+(b.height-a.height)*k+'px';
-   if(k<1)anim.raf=requestAnimationFrame(step);else stop();
-  })(t0);
- }
-
- function set(v){
+ function setOn(v){
   on=v;side.classList.toggle('on',v);bar.classList.toggle('on',v);bar.setAttribute('aria-hidden',String(!v));
   bar.querySelector('a').tabIndex=v?0:-1;
-  if(!motion()){stop();fly.style.visibility='';ava.style.visibility='';return}
-  if(v)flight(photo,fly,ava,ava);else flight(ava,ava,photo,fly);
  }
 
  function paint(){
   queued=false;
   var h=hero.getBoundingClientRect(),p=clamp(-h.top/Math.max(1,h.height-120));
-  if(!on&&p>.7)set(true);else if(on&&p<.55)set(false);
+  if(!on&&p>.7)setOn(true);else if(on&&p<.55)setOn(false);
   if(motion()){
-   var e=ease(clamp(p/.7)),dx=(side.getBoundingClientRect().left-fly.parentNode.getBoundingClientRect().left)*e,o=1-clamp(p*1.7);
-   fly.style.transform='translateX('+dx+'px) scale('+(1-.45*e)+')';
-   for(i=0;i<fade.length;i++){fade[i].style.opacity=o;fade[i].style.visibility=o<.02?'hidden':''}
+   // e runs 0..1 while the hero scrolls away; at 1 the photo sits exactly on the sidebar avatar
+   var e=ease(clamp(p/.7)),s=fly.parentNode.getBoundingClientRect(),t=ava.getBoundingClientRect(),
+       pad=parseFloat(getComputedStyle(frame).paddingLeft)||0,k=t.width/photo.offsetWidth,
+       x=(t.left-s.left-pad*k)*e,y=(t.top-s.top-pad*k)*e,done=e>=1,
+       o=1-clamp(p*1.7),so=clamp((p-.3)/.4);
+   fly.style.transform=e>0?'translate('+x+'px,'+y+'px) scale('+(1+(k-1)*e)+')':'';
+   frame.style.transition=e>0?'none':'';
+   frame.style.transform=e>0?'rotateY('+(-10*(1-e))+'deg) rotateX('+(4*(1-e))+'deg)':'';
+   fly.style.visibility=done?'hidden':'';
+   ava.style.visibility=done?'':'hidden';
+   style(parts,'transition','none');style(parts,'opacity',so);style(parts,'visibility',so>0?'visible':'hidden');
+   style(fade,'opacity',o);style(fade,'visibility',o<.02?'hidden':'');
   }else{
-   fly.style.transform='';
-   for(i=0;i<fade.length;i++){fade[i].style.opacity='';fade[i].style.visibility=''}
+   fly.style.transform=fly.style.visibility=frame.style.transition=frame.style.transform=ava.style.visibility='';
+   style(parts,'transition','');style(parts,'opacity','');style(parts,'visibility','');
+   style(fade,'opacity','');style(fade,'visibility','');
   }
   // the last section may never reach the middle of the screen, so light it up at the very bottom
   if(innerHeight+scrollY>=document.documentElement.scrollHeight-4)current('contact');
  }
  function queue(){if(!queued){queued=true;requestAnimationFrame(paint)}}
  addEventListener('scroll',queue,{passive:true});addEventListener('resize',queue);
- function reset(){stop();fly.style.visibility=on&&motion()?'hidden':'';ava.style.visibility='';queue()}
- [desk,still].forEach(function(m){m.addEventListener?m.addEventListener('change',reset):m.addListener(reset)});
+ [desk,still].forEach(function(m){m.addEventListener?m.addEventListener('change',queue):m.addListener(queue)});
 
  // table of contents: highlight the section in the middle of the screen
  var links=document.querySelectorAll('.toc a');
